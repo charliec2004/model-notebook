@@ -30,13 +30,14 @@
         <p id="model-status" class="hint" role="status">Fetching the OpenRouter model list.</p>
         <label class="question-label" for="question">Your question</label>
         <textarea id="question" rows="5" maxlength="20000" required placeholder="What question would you like to explore?"></textarea>
+        <div class="search-option"><label for="web-search"><input id="web-search" type="checkbox" aria-describedby="search-hint">Web search</label><p id="search-hint" class="hint">Allow the model to search · Same key · Adds search charges when used</p></div>
         <div class="run-row"><span class="hint">Fresh prompt each run · No added system prompt</span><button id="run" class="primary" disabled>Run question <span aria-hidden="true">↗</span></button></div>
       </form>
       <p id="run-status" class="status" role="status" aria-live="polite"></p>
       <section class="response-panel" aria-labelledby="response-heading">
         <div class="response-header"><div><p class="eyebrow">THE OUTPUT</p><h2 id="response-heading">Response</h2></div><button id="copy" class="secondary" disabled>Copy response</button></div>
         <div id="response-empty" class="empty-response"><span class="empty-mark" aria-hidden="true">↗</span><h3>A little room for perspective.</h3><p>Pick a model, ask a question, and its response will appear here.</p></div>
-        <article id="result" hidden><p id="result-meta" class="result-meta"></p><h3 id="result-question"></h3><p id="result-text" class="response-text"></p><p id="result-warning" class="warning"></p></article>
+        <article id="result" hidden><p id="result-meta" class="result-meta"></p><p id="result-search" class="result-meta"></p><h3 id="result-question"></h3><p id="result-text" class="response-text"></p><p id="result-warning" class="warning"></p><section id="sources" class="sources" aria-labelledby="sources-heading" hidden><h3 id="sources-heading">Sources</h3><ul id="source-list"></ul><p id="source-empty" class="hint" hidden>No source links were returned.</p></section></article>
       </section>
       <footer>Questions go to OpenRouter and the selected provider. Responses stay in this browser. <span>Output limit: 2,048 tokens · Temperature: 0.7</span></footer>
     </main>

@@ -14,6 +14,7 @@ Help a non-technical user run this project locally. Preserve its small, dependen
 ## Help the user get a key
 
 - Explain that an OpenRouter key is a private credential, and featured models generally cost credits per request.
+- Web search uses that same key and adds search charges when used. It is off by default. Explain the cost before a live test, show returned source links, and distinguish enabled search from reported search usage. Do not enable it or make a billable test without the user's authorization.
 - Guide the user to https://openrouter.ai/settings/keys after they sign in. Have them create a key named Model Notebook, choose a small spending limit, and copy it into the local app themselves. Use `docs/SETUP.md` for the walkthrough.
 - Never ask them to paste their key, password, or payment details into chat. Never read or print their key, commit it, put it in a URL, or save it to a file. Prefer the UI key field; an environment/secret-manager key is also supported when the user prefers it.
 - Creating an account, handling payment details, buying credits, or enabling top-ups is for the user. Do not do those actions as part of setup.

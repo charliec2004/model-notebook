@@ -13,6 +13,7 @@ from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 STATIC = Path(__file__).parent / "static"
@@ -48,10 +49,10 @@ def openrouter(path, key=None, payload=None):
         return result
     except HTTPError as error:
         messages = {
-            400: "OpenRouter rejected the request. Try another model.",
+            400: "OpenRouter rejected the request. Try another model or turn off web search.",
             401: "OpenRouter rejected the API key. Check your key.",
             402: "Your OpenRouter account needs more credits.",
-            403: "OpenRouter denied access to this model or request.",
+            403: "OpenRouter denied access to this model, request, or search engine. Check your account settings.",
             404: "This model is unavailable. Refresh the model list.",
             408: "OpenRouter timed out. The request may still have been billed.",
             429: "OpenRouter is rate limiting requests. Wait before running again.",
@@ -71,6 +72,35 @@ def text_field(body, name, maximum):
     if not isinstance(value, str) or not value.strip() or len(value) > maximum:
         raise APIError(400, "Invalid " + name.replace("_", " ") + ".")
     return value.strip()
+
+
+def citation_sources(message):
+    """Only return safe, distinct links from OpenRouter's citation annotations."""
+    annotations = message.get("annotations")
+    if not isinstance(annotations, list):
+        return []
+    sources, seen = [], set()
+    for annotation in annotations[:100]:
+        if not isinstance(annotation, dict) or annotation.get("type") != "url_citation":
+            continue
+        citation = annotation.get("url_citation")
+        if not isinstance(citation, dict):
+            continue
+        url = citation.get("url")
+        if not isinstance(url, str) or len(url) > 4096 or re.search(r"[\s\x00-\x1f\x7f]", url):
+            continue
+        try:
+            parsed = urlsplit(url)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password:
+                continue
+        except ValueError:
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        title = citation.get("title")
+        sources.append({"url": url, "title": title[:300] if isinstance(title, str) and title.strip() else parsed.hostname})
+    return sources
 
 
 class Server(ThreadingHTTPServer):
@@ -197,6 +227,9 @@ class Handler(BaseHTTPRequestHandler):
             if not re.fullmatch(r"~?[A-Za-z0-9_./:+-]+", model):
                 raise APIError(400, "Invalid model ID.")
             prompt = text_field(body, "prompt", 20000)
+            web_search = body.get("web_search", False)
+            if not isinstance(web_search, bool):
+                raise APIError(400, "Web search must be true or false.")
             entered_key = body.get("api_key", "")
             if not isinstance(entered_key, str):
                 raise APIError(400, "Invalid API key.")
@@ -213,10 +246,17 @@ class Handler(BaseHTTPRequestHandler):
                 if len(self.server.calls) >= 10:
                     raise APIError(429, "Limit: 10 runs per minute. Wait before running again.")
                 self.server.calls.append(now)
-            result = openrouter("/chat/completions", key, {
+            payload = {
                 "model": model, "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.7, "max_tokens": 2048, "stream": False,
-            })
+            }
+            if web_search:
+                payload["tools"] = [{"type": "openrouter:web_search", "parameters": {
+                    "engine": "exa", "mode": "auto", "max_uses": 1,
+                    "max_results": 5, "max_total_results": 5,
+                }}]
+                payload["max_tool_calls"] = 2
+            result = openrouter("/chat/completions", key, payload)
             choices = result.get("choices")
             if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
                 raise APIError(502, "OpenRouter returned no response.")
@@ -226,10 +266,17 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(content, str) or not content.strip():
                 raise APIError(502, "The model returned no text. Try another model or a shorter question.")
             returned_model = result.get("model")
+            usage = result.get("usage")
+            tool_usage = usage.get("server_tool_use") if isinstance(usage, dict) else None
+            searches = tool_usage.get("web_search_requests") if isinstance(tool_usage, dict) else None
+            if type(searches) is not int or searches < 0:
+                searches = None
             self.send(200, {"response": content,
                             "model": returned_model if isinstance(returned_model, str) else model,
                             "finish_reason": choice.get("finish_reason"),
-                            "usage": result.get("usage"), "provider": result.get("provider")})
+                            "usage": usage, "provider": result.get("provider"),
+                            "web_search": {"enabled": web_search, "engine": "exa" if web_search else None,
+                                           "requests": searches}, "sources": citation_sources(message)})
         except APIError as error:
             self.send(error.status, {"error": error.message})
         except (BrokenPipeError, ConnectionResetError, socket.timeout):

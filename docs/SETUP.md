@@ -52,9 +52,10 @@ No `pip install`, Node.js, or extra packages are needed.
 
 1. Paste your key into **OpenRouter API key**.
 2. Choose a model. The requested model families are grouped first. A **Latest** option follows newer releases automatically; a numbered option is better for repeating an experiment against a specific release.
-3. Type a question and click **Run question**. Wait for the answer. Each run makes a new, independent request.
-4. The answer appears in the main panel and is saved in the sidebar. Click any saved question to read it again. Keep the same question and change models to compare their answers.
-5. Use **Export JSON** to download your collection. This file contains your questions and answers, but no API key. **Remove** deletes a response; **Undo** restores the last removal.
+3. Type a question. Leave **Web search** off to get the model's unaided answer, or check it to allow a web search using your same OpenRouter key. Search adds charges when used: the current Exa search rate is $0.007 per search plus model tokens. The app requests at most one search with up to five results per run. Review [current pricing](https://openrouter.ai/tool/web-search/) if cost matters to your experiment.
+4. Click **Run question** and wait for the answer. Each run makes a new, independent request. With search enabled, the model decides whether it needs to search. The output says whether a search was reported and displays clickable source links when supplied. If usage is missing, the app says so instead of guessing.
+5. The answer appears in the main panel and is saved in the sidebar, including its search setting and source links. Click any saved question to read it again. Keep the same question and search setting while changing models to compare their answers; results from separate searches can differ.
+6. Use **Export JSON** to download your collection, including search details and source links. This file contains your questions and answers, but no API key. **Remove** deletes a response; **Undo** restores the last removal.
 
 Your saved responses remain in this browser after restarting the app. Clearing browser site data deletes them. The key is cleared on refresh, so paste it again when needed. Export any important results before clearing browser data.
 
@@ -74,5 +75,6 @@ In the terminal running the app, press **Ctrl+C** to stop it. Run the same start
 | API key rejected | Copy the key again without extra spaces, or create a replacement on OpenRouter. Use an OpenRouter key, not a direct provider key. |
 | Credits error | Check your OpenRouter balance and the key's limit. Add credits only if you want to pay for requests. |
 | Model unavailable or request rejected | Refresh the model list or choose another model. Catalog entries can be unavailable for your account or provider. |
+| Search unavailable or access denied | Turn off Web search or try another model. Your OpenRouter workspace may restrict search engines; check its Server Tools settings. No second key is needed. |
 | Request timed out | Wait before trying again. A timed-out request may still cost credits; the app does not retry automatically. |
 | Browser storage is unavailable or full | Export JSON before closing the page. New responses are being kept only in memory. |

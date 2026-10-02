@@ -45,6 +45,7 @@ function updateControls() {
   $("run").firstChild.textContent = busy ? "Running… " : "Run question ";
   $("question").disabled = busy;
   $("api-key").disabled = busy;
+  $("web-search").disabled = busy;
   $("model").disabled = busy || !$("model").value;
   $("refresh-models").disabled = busy;
 }
@@ -108,6 +109,25 @@ function persist() {
   }
 }
 
+function safeSources(sources) {
+  if (!Array.isArray(sources)) return [];
+  const seen = new Set();
+  return sources.slice(0, 100).flatMap((source) => {
+    if (!source || typeof source.url !== "string" || source.url.length > 4096 || /[\s\x00-\x1f\x7f]/.test(source.url)) return [];
+    try {
+      const url = new URL(source.url);
+      if (!["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password || seen.has(url.href)) return [];
+      seen.add(url.href);
+      return [{url: url.href, title: typeof source.title === "string" && source.title.trim() ? source.title.slice(0, 300) : url.hostname}];
+    } catch { return []; }
+  });
+}
+
+function searchInfo(value) {
+  return {enabled: value?.enabled === true, engine: value?.enabled === true ? "exa" : null,
+    requests: Number.isInteger(value?.requests) && value.requests >= 0 ? value.requests : null};
+}
+
 function restore() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
@@ -122,6 +142,7 @@ function restore() {
       provider: typeof item.provider === "string" ? item.provider : null,
       finish_reason: typeof item.finish_reason === "string" ? item.finish_reason : null,
       usage: item.usage && typeof item.usage === "object" ? item.usage : null,
+      web_search: searchInfo(item.web_search), sources: safeSources(item.sources),
       parameters: {temperature: 0.7, max_tokens: 2048},
     }));
   } catch {
@@ -142,6 +163,22 @@ function show(record) {
     $("result-meta").textContent = `${record.model_name} · ${dateLabel(record.created_at)} · Returned: ${record.model}${record.provider ? " · " + record.provider : ""}`;
     $("result-question").textContent = record.prompt;
     $("result-text").textContent = record.response;
+    const search = searchInfo(record.web_search);
+    $("result-search").textContent = !search.enabled ? "Web search off" : search.requests === 0 ? "Web search enabled · Model did not request a search" :
+      search.requests === null ? "Web search enabled · Search usage not reported" : `Web search used · ${search.requests} ${search.requests === 1 ? "search" : "searches"}`;
+    const sources = safeSources(record.sources);
+    $("sources").hidden = !search.enabled && !sources.length;
+    $("source-empty").hidden = sources.length > 0;
+    $("source-list").replaceChildren(...sources.map((source) => {
+      const item = document.createElement("li");
+      const link = document.createElement("a");
+      link.href = source.url;
+      link.textContent = source.title;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      item.append(link);
+      return item;
+    }));
     $("result-warning").textContent = record.finish_reason === "length" ? "Output reached the 2,048-token limit and may be incomplete." :
       record.finish_reason === "content_filter" ? "The provider filtered part of this response." : "";
   }
@@ -160,7 +197,7 @@ function renderHistory() {
     open.setAttribute("aria-pressed", String(current?.id === record.id));
     const model = document.createElement("span");
     model.className = "saved-model";
-    model.textContent = record.model_name;
+    model.textContent = record.model_name + (record.web_search?.enabled ? " · Web search" : "");
     const question = document.createElement("span");
     question.className = "saved-question";
     question.textContent = record.prompt;
@@ -205,16 +242,18 @@ $("run-form").addEventListener("submit", async (event) => {
   }
   const model = $("model").value;
   const modelName = $("model").selectedOptions[0].textContent;
+  const webSearch = $("web-search").checked;
   busy = true;
   updateControls();
   status("run-status", "Waiting for the model… Your previous response remains available.");
   try {
-    const result = await api("/api/run", {api_key: key, prompt, model});
+    const result = await api("/api/run", {api_key: key, prompt, model, web_search: webSearch});
     const record = {
       id: crypto.randomUUID(), created_at: new Date().toISOString(),
       prompt, requested_model: model, model_name: modelName,
       model: result.model, response: result.response,
       provider: result.provider, finish_reason: result.finish_reason, usage: result.usage,
+      web_search: searchInfo(result.web_search), sources: safeSources(result.sources),
       parameters: {temperature: 0.7, max_tokens: 2048},
     };
     history.unshift(record);
